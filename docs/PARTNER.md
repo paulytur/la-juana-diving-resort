@@ -80,11 +80,13 @@ https://la-juana-resort.vercel.app/embed/book?partner=PARTNER_ID
 
 ---
 
-## 3. Partner API (availability + book links)
+## 3. Partner API (availability + bookings)
 
-For sites that want to show rooms and prices on their own UI.
+For sites that want to show rooms and prices on their own UI, or create bookings directly.
 
 **Requires an API key.** Create one in **Admin → Partners**, then share it with the partner. Pass it as an `x-api-key` header (preferred), `Authorization: Bearer` token, or `apiKey` query parameter.
+
+### Check availability
 
 ```
 GET /api/partner/availability?checkIn=2026-08-01&checkOut=2026-08-03&guests=4
@@ -113,9 +115,102 @@ The partner is identified by their key — no `partner` query parameter needed. 
 }
 ```
 
-CORS is enabled so partner sites can call this from the browser.
+### Create a booking
 
-### Example fetch (partner site)
+```
+POST /api/partner/bookings
+x-api-key: lj_live_...
+Content-Type: application/json
+```
+
+**Request body:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `roomSlug` or `roomTypeId` | Yes (one of) | Room to book |
+| `checkIn` | Yes | `YYYY-MM-DD` |
+| `checkOut` | Yes | `YYYY-MM-DD` |
+| `guests` | Yes | 1–20 |
+| `guestName` | Yes | Guest full name |
+| `guestEmail` | Yes | Guest email |
+| `guestPhone` | Yes | Contact number |
+| `specialRequests` | No | Free text |
+| `pets` | No | Default `0` |
+| `dayTourGuests` | No | Default `0` |
+| `paymentReference` | No | GCash/bank ref (with `paymentProofUrl`) |
+| `paymentProofUrl` | No | Receipt image URL from upload |
+
+If payment fields are omitted, the response includes `urls.payment` — send the guest there to pay the 50% deposit via QR.
+
+**Example:**
+
+```javascript
+const response = await fetch(
+  "https://la-juana-resort.vercel.app/api/partner/bookings",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": "lj_live_YOUR_KEY",
+    },
+    body: JSON.stringify({
+      roomSlug: "hiraya",
+      checkIn: "2026-08-01",
+      checkOut: "2026-08-03",
+      guests: 4,
+      guestName: "Jane Cruz",
+      guestEmail: "jane@example.com",
+      guestPhone: "+639171234567",
+    }),
+  },
+);
+const booking = await response.json();
+// booking.reference — booking ID
+// booking.urls.payment — send guest here if payment not included
+// booking.urls.confirmation — after payment is submitted
+```
+
+**Response (201):**
+
+```json
+{
+  "reference": "LJ-20260801-ABC12",
+  "status": "PENDING",
+  "partner": "mabini-dive-shop",
+  "guest": { "name": "Jane Cruz", "email": "jane@example.com", "phone": "+639171234567" },
+  "room": { "slug": "hiraya", "name": "Hiraya" },
+  "stay": {
+    "checkIn": "2026-08-01",
+    "checkOut": "2026-08-03",
+    "guests": 4,
+    "nights": 2
+  },
+  "pricing": {
+    "totalAmount": 12000,
+    "depositAmount": 6000,
+    "balanceDue": 6000
+  },
+  "payment": { "completed": false },
+  "urls": {
+    "payment": "https://la-juana-resort.vercel.app/book/pay/LJ-20260801-ABC12",
+    "confirmation": "https://la-juana-resort.vercel.app/book/confirmation/LJ-20260801-ABC12",
+    "invoice": null
+  }
+}
+```
+
+### Look up a booking
+
+Partners can only retrieve bookings they created.
+
+```
+GET /api/partner/bookings?reference=LJ-20260801-ABC12
+x-api-key: lj_live_...
+```
+
+CORS is enabled so partner sites can call these endpoints from the browser.
+
+### Example fetch (availability)
 
 ```javascript
 const params = new URLSearchParams({

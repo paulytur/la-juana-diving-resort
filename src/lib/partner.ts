@@ -81,8 +81,12 @@ export function partnerCorsHeaders(request: Request) {
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, x-api-key, Authorization",
     "Access-Control-Max-Age": "86400",
   };
+}
+
+export function partnerUnauthorizedMessage() {
+  return "A valid API key is required. Pass it as an x-api-key header, Bearer token, or apiKey query parameter.";
 }

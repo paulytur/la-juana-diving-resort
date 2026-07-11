@@ -4,6 +4,7 @@ import {
   buildPartnerBookingUrl,
   getPartnerFromRequest,
   partnerCorsHeaders,
+  partnerUnauthorizedMessage,
 } from "@/lib/partner";
 import { calculateDeposit, parseDateInput } from "@/lib/pricing";
 
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
   if (!partnerAccount) {
     return corsJson(
       request,
-      { error: "A valid API key is required. Pass it as an x-api-key header, Bearer token, or apiKey query parameter." },
+      { error: partnerUnauthorizedMessage() },
       401,
     );
   }

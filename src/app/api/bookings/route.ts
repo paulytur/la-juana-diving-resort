@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
-import { isRoomAvailable } from "@/lib/availability";
+import { BookingError, createBooking } from "@/lib/create-booking";
 import { prisma } from "@/lib/db";
 import { resolvePartnerSlug } from "@/lib/partner";
-import {
-  calculateBookingTotal,
-  calculateDeposit,
-  generateBookingReference,
-  parseDateInput,
-} from "@/lib/pricing";
 import { bookingSchema } from "@/lib/validation";
 
 export async function POST(request: Request) {
@@ -22,82 +16,27 @@ export async function POST(request: Request) {
     }
 
     const data = parsed.data;
-    const checkIn = parseDateInput(data.checkIn);
-    const checkOut = parseDateInput(data.checkOut);
-
-    if (checkOut <= checkIn) {
-      return NextResponse.json(
-        { error: "Check-out must be after check-in" },
-        { status: 400 },
-      );
-    }
-
-    const roomType = await prisma.roomType.findUnique({
-      where: { id: data.roomTypeId, isActive: true },
-    });
-    if (!roomType) {
-      return NextResponse.json({ error: "Room not found" }, { status: 404 });
-    }
-
-    if (data.guests < roomType.capacityMin || data.guests > roomType.capacityMax) {
-      return NextResponse.json(
-        {
-          error: `${roomType.name} accommodates ${roomType.capacityMin}–${roomType.capacityMax} guests`,
-        },
-        { status: 400 },
-      );
-    }
-
-    const available = await isRoomAvailable(
-      data.roomTypeId,
-      checkIn,
-      checkOut,
-      data.guests,
-    );
-    if (!available) {
-      return NextResponse.json(
-        { error: "Selected room is not available for those dates" },
-        { status: 409 },
-      );
-    }
-
-    const pricing = calculateBookingTotal({
-      roomType,
-      checkIn,
-      checkOut,
+    const booking = await createBooking({
+      roomTypeId: data.roomTypeId,
+      checkIn: data.checkIn,
+      checkOut: data.checkOut,
       guests: data.guests,
+      guestName: data.guestName,
+      guestEmail: data.guestEmail,
+      guestPhone: data.guestPhone,
+      specialRequests: data.specialRequests,
       pets: data.pets,
       dayTourGuests: data.dayTourGuests,
-    });
-
-    const booking = await prisma.booking.create({
-      data: {
-        reference: generateBookingReference(),
-        roomTypeId: data.roomTypeId,
-        checkIn,
-        checkOut,
-        guests: data.guests,
-        guestName: data.guestName,
-        guestEmail: data.guestEmail,
-        guestPhone: data.guestPhone,
-        specialRequests: data.specialRequests,
-        pets: data.pets,
-        dayTourGuests: data.dayTourGuests,
-        subtotal: pricing.subtotal,
-        petFee: pricing.petFee,
-        dayTourFee: pricing.dayTourFee,
-        totalAmount: pricing.totalAmount,
-        nights: pricing.nights,
-        depositAmount: calculateDeposit(pricing.totalAmount),
-        paymentReference: data.paymentReference,
-        paymentProofUrl: data.paymentProofUrl,
-        partnerSource: await resolvePartnerSlug(data.partnerSource),
-      },
-      include: { roomType: true },
+      paymentReference: data.paymentReference,
+      paymentProofUrl: data.paymentProofUrl,
+      partnerSource: await resolvePartnerSlug(data.partnerSource),
     });
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
+    if (error instanceof BookingError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error(error);
     return NextResponse.json(
       { error: "Unable to create booking" },

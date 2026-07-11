@@ -220,6 +220,33 @@ export function AdminPartnersManager({ partners }: AdminPartnersManagerProps) {
                       {bookingLink}
                     </code>
                   </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Partner API
+                    </p>
+                    <code className="mt-1 block w-fit max-w-full overflow-x-auto rounded-lg border border-line bg-white px-3 py-1.5 font-mono text-xs">
+                      GET {getSiteUrl()}/api/partner/availability?checkIn=…&checkOut=…&guests=4
+                    </code>
+                    <code className="mt-2 block w-fit max-w-full overflow-x-auto rounded-lg border border-line bg-white px-3 py-1.5 font-mono text-xs">
+                      POST {getSiteUrl()}/api/partner/bookings
+                    </code>
+                    <code className="mt-2 block w-fit max-w-full overflow-x-auto rounded-lg border border-line bg-white px-3 py-1.5 font-mono text-xs">
+                      GET {getSiteUrl()}/api/partner/bookings?reference=…
+                    </code>
+                    <p className="mt-2 text-xs text-muted">
+                      Pass <span className="font-mono">x-api-key</span> header. See{" "}
+                      <a
+                        href="/docs/PARTNER.md"
+                        className="font-semibold text-brand-blue hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        partner docs
+                      </a>
+                      .
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
