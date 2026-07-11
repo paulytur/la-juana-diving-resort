@@ -1,0 +1,6 @@
+.env
+.env.local
+.env.*.local
+dev.db
+*.db
+supabase/.temp/

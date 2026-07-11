@@ -1,0 +1,192 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { PageShell } from "@/components/page-shell";
+import { SiteFooter, SiteHeader } from "@/components/site-chrome";
+import { RESORT } from "@/lib/constants";
+import { prisma } from "@/lib/db";
+import { formatDateRange, formatPHP } from "@/lib/pricing";
+
+export const dynamic = "force-dynamic";
+
+type ConfirmationPageProps = {
+  params: Promise<{ reference: string }>;
+};
+
+export default async function ConfirmationPage({ params }: ConfirmationPageProps) {
+  const { reference } = await params;
+  const booking = await prisma.booking.findUnique({
+    where: { reference },
+    include: { roomType: true },
+  });
+
+  if (!booking) notFound();
+
+  return (
+    <PageShell>
+      <SiteHeader />
+      <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
+        <div className="surface-card rounded-[2rem] border-brand-yellow bg-brand-yellow-soft p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-blue text-2xl font-bold text-white">
+            ✓
+          </div>
+          <p className="section-eyebrow">You&apos;re all set!</p>
+          <h1 className="section-title mt-3">
+            Thanks, {booking.guestName.split(" ")[0]}!
+          </h1>
+          <p className="section-lead mt-4">
+            Your booking request was received. Keep this reference handy:
+          </p>
+          <p className="mt-3 inline-block rounded-xl bg-white px-5 py-2 font-mono text-lg font-bold text-brand-blue">
+            {booking.reference}
+          </p>
+        </div>
+
+        <div className="surface-card mt-8 rounded-2xl p-6 sm:p-8">
+          <h2 className="text-xl font-bold text-brand-blue">What happens next?</h2>
+          <ul className="mt-4 space-y-4 text-sm text-foreground">
+            {booking.status === "PENDING" && (
+              <>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 text-brand-blue" aria-hidden>
+                    •
+                  </span>
+                  <span>
+                    We verify your downpayment of{" "}
+                    <strong>{formatPHP(booking.depositAmount)}</strong>.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 text-brand-blue" aria-hidden>
+                    •
+                  </span>
+                  <span>
+                    You&apos;ll hear from us at{" "}
+                    <strong>{booking.guestEmail}</strong> or{" "}
+                    <strong>{booking.guestPhone}</strong>.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 text-brand-blue" aria-hidden>
+                    •
+                  </span>
+                  <span>
+                    Once verified, your reservation is locked in. The balance of{" "}
+                    <strong>
+                      {formatPHP(booking.totalAmount - booking.depositAmount)}
+                    </strong>{" "}
+                    is due on arrival.
+                  </span>
+                </li>
+              </>
+            )}
+            {(booking.status === "CONFIRMED" || booking.status === "COMPLETED") && (
+              <>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 text-brand-blue" aria-hidden>
+                    •
+                  </span>
+                  <span>
+                    Your reservation is <strong>confirmed</strong>. Your downpayment
+                    of <strong>{formatPHP(booking.depositAmount)}</strong> has been
+                    verified.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 text-brand-blue" aria-hidden>
+                    •
+                  </span>
+                  <span>
+                    The balance of{" "}
+                    <strong>
+                      {formatPHP(booking.totalAmount - booking.depositAmount)}
+                    </strong>{" "}
+                    is due when you arrive.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 text-brand-blue" aria-hidden>
+                    •
+                  </span>
+                  <span>
+                    Download your invoice below for your records.
+                  </span>
+                </li>
+              </>
+            )}
+          </ul>
+          {(booking.status === "CONFIRMED" || booking.status === "COMPLETED") && (
+            <a
+              href={`/api/bookings/${booking.reference}/invoice`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary mt-6 inline-flex px-5 py-2.5 text-sm"
+            >
+              Download invoice (PDF)
+            </a>
+          )}
+        </div>
+
+        <div className="surface-card mt-6 rounded-2xl p-6 sm:p-8">
+          <h2 className="text-xl font-bold text-brand-blue">Booking summary</h2>
+          <dl className="mt-5 space-y-3 text-sm">
+            {[
+              ["Room", booking.roomType.name],
+              ["Dates", formatDateRange(booking.checkIn, booking.checkOut)],
+              ["Guests", String(booking.guests)],
+              ["Room total", formatPHP(booking.subtotal)],
+              ...(booking.petFee > 0
+                ? [["Pet fee", formatPHP(booking.petFee)] as const]
+                : []),
+              ...(booking.dayTourFee > 0
+                ? [["Day tour", formatPHP(booking.dayTourFee)] as const]
+                : []),
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="flex justify-between gap-4 border-b border-line pb-3 last:border-0"
+              >
+                <dt className="text-muted">{label}</dt>
+                <dd className="font-medium text-right">{value}</dd>
+              </div>
+            ))}
+            <div className="flex justify-between gap-4 border-t border-line pt-4 text-base font-bold text-brand-blue">
+              <dt>Total</dt>
+              <dd>{formatPHP(booking.totalAmount)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 text-sm font-semibold text-brand-blue">
+              <dt>Downpayment paid (50%)</dt>
+              <dd>{formatPHP(booking.depositAmount)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 text-sm text-muted">
+              <dt>Balance on arrival</dt>
+              <dd>{formatPHP(booking.totalAmount - booking.depositAmount)}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="surface-card mt-6 rounded-2xl p-6 text-sm text-muted">
+          <p>
+            Need help sooner? Call{" "}
+            <a
+              href={`tel:${RESORT.phone}`}
+              className="font-semibold text-brand-blue hover:underline"
+            >
+              {RESORT.phone}
+            </a>{" "}
+            or email {RESORT.email}.
+          </p>
+        </div>
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link href="/" className="btn-primary px-5 py-2.5">
+            Back to home
+          </Link>
+          <Link href="/rooms" className="btn-secondary px-5 py-2.5">
+            Browse rooms
+          </Link>
+        </div>
+      </main>
+      <SiteFooter />
+    </PageShell>
+  );
+}
