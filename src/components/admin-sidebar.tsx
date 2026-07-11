@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/admin/bookings", label: "Bookings" },
   { href: "/admin/rooms", label: "Rooms" },
   { href: "/admin/facilities", label: "Facilities" },
+  { href: "/admin/partners", label: "Partners" },
   { href: "/admin/settings", label: "Payment settings" },
 ] as const;
 

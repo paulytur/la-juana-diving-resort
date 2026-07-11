@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isRoomAvailable } from "@/lib/availability";
 import { prisma } from "@/lib/db";
+import { resolvePartnerSlug } from "@/lib/partner";
 import {
   calculateBookingTotal,
   calculateDeposit,
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
         depositAmount: calculateDeposit(pricing.totalAmount),
         paymentReference: data.paymentReference,
         paymentProofUrl: data.paymentProofUrl,
+        partnerSource: await resolvePartnerSlug(data.partnerSource),
       },
       include: { roomType: true },
     });

@@ -134,6 +134,11 @@ export function AdminBookingTable({
                 <div>
                   <p className="text-lg font-bold text-brand-blue">{booking.guestName}</p>
                   <p className="text-sm text-muted">{booking.reference}</p>
+                  {booking.partnerSource && (
+                    <p className="mt-1 text-xs font-medium text-brand-blue">
+                      Partner: {booking.partnerSource}
+                    </p>
+                  )}
                 </div>
                 <AdminStatusBadge status={booking.status} />
               </div>

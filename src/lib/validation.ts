@@ -13,6 +13,7 @@ export const bookingSchema = z.object({
   dayTourGuests: z.coerce.number().int().min(0).max(20).default(0),
   paymentReference: z.string().min(2).max(100),
   paymentProofUrl: z.string().min(1).max(500),
+  partnerSource: z.string().max(80).optional(),
 });
 
 export const paymentSettingsSchema = z.object({
@@ -66,6 +67,16 @@ export const facilityCreateSchema = z.object({
   imageUrl: z.string().min(1).max(500),
   sortOrder: z.coerce.number().int().min(0).max(999).optional(),
   isActive: z.boolean().optional(),
+});
+
+export const partnerCreateSchema = z.object({
+  name: z.string().min(2).max(100),
+});
+
+export const partnerUpdateSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  isActive: z.boolean().optional(),
+  regenerateKey: z.boolean().optional(),
 });
 
 export const facilityUpdateSchema = z.object({

@@ -4,16 +4,25 @@ import { PageShell } from "@/components/page-shell";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { RESORT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { parsePartnerSource } from "@/lib/partner";
 import { getPaymentSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 type BookPageProps = {
-  searchParams: Promise<{ room?: string }>;
+  searchParams: Promise<{
+    room?: string;
+    checkIn?: string;
+    checkOut?: string;
+    guests?: string;
+    partner?: string;
+  }>;
 };
 
 export default async function BookPage({ searchParams }: BookPageProps) {
   const params = await searchParams;
+  const partner = parsePartnerSource(params.partner);
+  const guests = params.guests ? Number(params.guests) : undefined;
   const [rooms, paymentSettings] = await Promise.all([
     prisma.roomType.findMany({
       where: { isActive: true },
@@ -42,6 +51,11 @@ export default async function BookPage({ searchParams }: BookPageProps) {
         <BookingForm
           rooms={rooms}
           initialRoomSlug={params.room}
+          initialCheckIn={params.checkIn}
+          initialCheckOut={params.checkOut}
+          initialGuests={Number.isFinite(guests) && guests! >= 1 ? guests : undefined}
+          partnerSource={partner}
+          autoSearch={Boolean(params.checkIn && params.checkOut && guests)}
           paymentSettings={paymentSettings}
         />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -36,6 +36,12 @@ type AvailableRoom = {
 type BookingFormProps = {
   rooms: RoomType[];
   initialRoomSlug?: string;
+  initialCheckIn?: string;
+  initialCheckOut?: string;
+  initialGuests?: number;
+  partnerSource?: string;
+  embedMode?: boolean;
+  autoSearch?: boolean;
   paymentSettings: PaymentSettings;
 };
 
@@ -50,6 +56,12 @@ const STEPS = ["Dates & guests", "Choose a room", "Pay & confirm"] as const;
 export function BookingForm({
   rooms,
   initialRoomSlug,
+  initialCheckIn,
+  initialCheckOut,
+  initialGuests,
+  partnerSource,
+  embedMode = false,
+  autoSearch = false,
   paymentSettings,
 }: BookingFormProps) {
   const router = useRouter();
@@ -57,9 +69,11 @@ export function BookingForm({
   const initialRoom = rooms.find((room) => room.slug === initialRoomSlug);
 
   const [step, setStep] = useState(1);
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
-  const [guests, setGuests] = useState(initialRoom?.capacityMin ?? 1);
+  const [checkIn, setCheckIn] = useState(initialCheckIn ?? "");
+  const [checkOut, setCheckOut] = useState(initialCheckOut ?? "");
+  const [guests, setGuests] = useState(
+    initialGuests ?? initialRoom?.capacityMin ?? 1,
+  );
 
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
   const [nights, setNights] = useState(0);
@@ -84,6 +98,7 @@ export function BookingForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const autoSearched = useRef(false);
 
   const today = new Date().toISOString().slice(0, 10);
   const checkOutMin = checkIn || today;
@@ -121,11 +136,37 @@ export function BookingForm({
   async function goToRooms() {
     if (!hasDates) return;
     const found = await searchAvailability();
-    setSelectedRoomId((current) =>
-      found.some((room) => room.id === current) ? current : "",
-    );
+    setSelectedRoomId((current) => {
+      if (current && found.some((room) => room.id === current)) return current;
+      const preferred = found.find((room) => room.slug === initialRoomSlug);
+      return preferred?.id ?? "";
+    });
     setStep(2);
   }
+
+  useEffect(() => {
+    if (
+      !autoSearch ||
+      autoSearched.current ||
+      !checkIn ||
+      !checkOut ||
+      checkOut <= checkIn
+    ) {
+      return;
+    }
+
+    autoSearched.current = true;
+
+    void (async () => {
+      const found = await searchAvailability();
+      setSelectedRoomId((current) => {
+        if (current && found.some((room) => room.id === current)) return current;
+        const preferred = found.find((room) => room.slug === initialRoomSlug);
+        return preferred?.id ?? "";
+      });
+      setStep(2);
+    })();
+  }, [autoSearch, checkIn, checkOut, initialRoomSlug, searchAvailability]);
 
   const totals = (() => {
     if (!selectedRoom) return null;
@@ -188,6 +229,7 @@ export function BookingForm({
           ...contact,
           paymentReference: paymentReference.trim(),
           paymentProofUrl,
+          ...(partnerSource ? { partnerSource } : {}),
         }),
       });
       const data = await response.json();
@@ -204,7 +246,7 @@ export function BookingForm({
   }
 
   return (
-    <div className="space-y-8">
+    <div className={embedMode ? "space-y-6" : "space-y-8"}>
       <ol className="flex flex-wrap gap-3">
         {STEPS.map((label, index) => {
           const stepNumber = index + 1;

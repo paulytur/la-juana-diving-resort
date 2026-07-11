@@ -74,6 +74,8 @@ Open [http://localhost:3000](http://localhost:3000) for the public site.
 
 Admin panel: [http://localhost:3000/admin](http://localhost:3000/admin)
 
+**Partner sites:** See [docs/PARTNER.md](docs/PARTNER.md) for embed widgets, booking links, and the partner API.
+
 Default admin credentials (change in `.env` before production):
 
 - Email: `admin@lajuana.ops`
