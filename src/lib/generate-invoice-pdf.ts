@@ -2,7 +2,10 @@ import { format } from "date-fns";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { Booking, RoomType } from "@/generated/prisma/client";
 import { RESORT } from "@/lib/constants";
-import { formatDateRange, formatPHP } from "@/lib/pricing";
+import {
+  formatDateRangeForPdf,
+  formatPHPForPdf,
+} from "@/lib/pricing";
 
 export type BookingForInvoice = Booking & { roomType: RoomType };
 
@@ -10,6 +13,15 @@ const BRAND = rgb(26 / 255, 66 / 255, 196 / 255);
 const INK = rgb(26 / 255, 46 / 255, 94 / 255);
 const MUTED = rgb(107 / 255, 122 / 255, 153 / 255);
 const LINE = rgb(232 / 255, 236 / 255, 244 / 255);
+
+/** Strip characters that WinAnsi Helvetica cannot encode. */
+function pdfText(value: string) {
+  return value
+    .replace(/\u20b1/g, "PHP ")
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\u00b7/g, "|")
+    .replace(/[^\u0000-\u00ff]/g, "");
+}
 
 function drawLine(
   page: ReturnType<PDFDocument["getPages"]>[number],
@@ -73,7 +85,7 @@ export async function generateInvoicePdf(
     color: MUTED,
   });
   y -= 14;
-  page.drawText(`${RESORT.phone} · ${RESORT.email}`, {
+  page.drawText(pdfText(`${RESORT.phone} | ${RESORT.email}`), {
     x: margin,
     y,
     size: 9,
@@ -137,7 +149,7 @@ export async function generateInvoicePdf(
     color: BRAND,
   });
   y -= 18;
-  page.drawText(booking.guestName, {
+  page.drawText(pdfText(booking.guestName), {
     x: margin,
     y,
     size: 11,
@@ -196,12 +208,12 @@ export async function generateInvoicePdf(
   y -= 18;
 
   const roomLabel = booking.roomType.pricePerPerson
-    ? `${booking.roomType.name} (${formatPHP(booking.roomType.pricePerNight)}/pax/night)`
-    : `${booking.roomType.name} (${formatPHP(booking.roomType.pricePerNight)}/night)`;
+    ? `${booking.roomType.name} (${formatPHPForPdf(booking.roomType.pricePerNight)}/pax/night)`
+    : `${booking.roomType.name} (${formatPHPForPdf(booking.roomType.pricePerNight)}/night)`;
 
   const lineItems: { label: string; qty: string; amount: number }[] = [
     {
-      label: `${roomLabel}\n${formatDateRange(booking.checkIn, booking.checkOut)} · ${booking.guests} guest${booking.guests === 1 ? "" : "s"}`,
+      label: `${roomLabel}\n${formatDateRangeForPdf(booking.checkIn, booking.checkOut)} | ${booking.guests} guest${booking.guests === 1 ? "" : "s"}`,
       qty: booking.roomType.pricePerPerson
         ? `${booking.guests} × ${booking.nights}n`
         : `${booking.nights} night${booking.nights === 1 ? "" : "s"}`,
@@ -226,7 +238,7 @@ export async function generateInvoicePdf(
   }
 
   for (const item of lineItems) {
-    const lines = item.label.split("\n");
+    const lines = pdfText(item.label).split("\n");
     page.drawText(lines[0], {
       x: colDesc,
       y,
@@ -250,7 +262,7 @@ export async function generateInvoicePdf(
       font: fontRegular,
       color: INK,
     });
-    const amountText = formatPHP(item.amount);
+    const amountText = formatPHPForPdf(item.amount);
     page.drawText(amountText, {
       x: colAmount,
       y,
@@ -266,12 +278,12 @@ export async function generateInvoicePdf(
   y -= 22;
 
   const totals: [string, string, boolean][] = [
-    ["Subtotal", formatPHP(booking.subtotal + booking.petFee + booking.dayTourFee), false],
-    ["Total", formatPHP(booking.totalAmount), true],
-    ["Downpayment paid (50%)", formatPHP(booking.depositAmount), false],
+    ["Subtotal", formatPHPForPdf(booking.subtotal + booking.petFee + booking.dayTourFee), false],
+    ["Total", formatPHPForPdf(booking.totalAmount), true],
+    ["Downpayment paid (50%)", formatPHPForPdf(booking.depositAmount), false],
     [
       "Balance due on arrival",
-      formatPHP(booking.totalAmount - booking.depositAmount),
+      formatPHPForPdf(booking.totalAmount - booking.depositAmount),
       true,
     ],
   ];
@@ -320,7 +332,7 @@ export async function generateInvoicePdf(
     });
     y -= 14;
     const maxWidth = contentWidth;
-    const words = booking.specialRequests.split(/\s+/);
+    const words = pdfText(booking.specialRequests).split(/\s+/);
     let line = "";
     for (const word of words) {
       const test = line ? `${line} ${word}` : word;

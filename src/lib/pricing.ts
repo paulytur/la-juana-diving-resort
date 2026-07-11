@@ -11,6 +11,24 @@ export function formatPHP(amount: number) {
   }).format(amount);
 }
 
+/** WinAnsi-safe currency for pdf-lib standard fonts (no peso sign). */
+export function formatPHPForPdf(amount: number) {
+  const formatted = new Intl.NumberFormat("en-PH", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+  return `PHP ${formatted}`;
+}
+
+export function formatDateRange(checkIn: Date, checkOut: Date) {
+  return `${format(checkIn, "MMM d, yyyy")} – ${format(checkOut, "MMM d, yyyy")}`;
+}
+
+/** WinAnsi-safe date range for pdf-lib standard fonts (ASCII hyphen). */
+export function formatDateRangeForPdf(checkIn: Date, checkOut: Date) {
+  return `${format(checkIn, "MMM d, yyyy")} - ${format(checkOut, "MMM d, yyyy")}`;
+}
+
 export function calculateNights(checkIn: Date, checkOut: Date) {
   const nights = differenceInCalendarDays(checkOut, checkIn);
   return Math.max(nights, 0);
@@ -44,10 +62,6 @@ export function calculateBookingTotal({
 
 export function calculateDeposit(totalAmount: number) {
   return Math.round(totalAmount * DEPOSIT_RATE);
-}
-
-export function formatDateRange(checkIn: Date, checkOut: Date) {
-  return `${format(checkIn, "MMM d, yyyy")} – ${format(checkOut, "MMM d, yyyy")}`;
 }
 
 export function getDateRangeDays(checkIn: Date, checkOut: Date) {
