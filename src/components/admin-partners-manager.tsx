@@ -229,10 +229,10 @@ export function AdminPartnersManager({ partners }: AdminPartnersManagerProps) {
                       GET {getSiteUrl()}/api/partner/availability?checkIn=…&checkOut=…&guests=4
                     </code>
                     <code className="mt-2 block w-fit max-w-full overflow-x-auto rounded-lg border border-line bg-white px-3 py-1.5 font-mono text-xs">
-                      POST {getSiteUrl()}/api/partner/bookings
+                      POST {getSiteUrl()}/api/partner/bookings → redirect guest to paymentUrl
                     </code>
                     <code className="mt-2 block w-fit max-w-full overflow-x-auto rounded-lg border border-line bg-white px-3 py-1.5 font-mono text-xs">
-                      GET {getSiteUrl()}/api/partner/bookings?reference=…
+                      {getSiteUrl()}/partner/pay/LJ-… (bank transfer + receipt upload)
                     </code>
                     <p className="mt-2 text-xs text-muted">
                       Pass <span className="font-mono">x-api-key</span> header. See{" "}

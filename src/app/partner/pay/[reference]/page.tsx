@@ -13,11 +13,11 @@ import { getPaymentSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
-type PayPageProps = {
+type PartnerPayPageProps = {
   params: Promise<{ reference: string }>;
 };
 
-export default async function BookingPayPage({ params }: PayPageProps) {
+export default async function PartnerPayPage({ params }: PartnerPayPageProps) {
   const { reference } = await params;
   const [booking, paymentSettings] = await Promise.all([
     getPaymentBooking(reference),
@@ -29,17 +29,21 @@ export default async function BookingPayPage({ params }: PayPageProps) {
       <PageShell>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-14 text-center sm:px-6">
-          <h1 className="section-title">Booking not found</h1>
+          <h1 className="section-title">Payment link not found</h1>
           <p className="section-lead mt-4">
             This payment link may be invalid or expired.
           </p>
           <Link href="/book" className="btn-primary mt-8 inline-flex px-5 py-2.5">
-            Start a new booking
+            Book on {RESORT.name}
           </Link>
         </main>
         <SiteFooter />
       </PageShell>
     );
+  }
+
+  if (!booking.partnerSource) {
+    redirect(`/book/pay/${reference}`);
   }
 
   if (booking.paymentProofUrl) {
@@ -53,11 +57,12 @@ export default async function BookingPayPage({ params }: PayPageProps) {
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-14">
         <div className="mb-8 max-w-2xl">
-          <p className="section-eyebrow">Complete payment</p>
+          <p className="section-eyebrow">Partner payment</p>
           <h1 className="section-title mt-2">Upload your bank transfer receipt</h1>
           <p className="section-lead mt-4">
-            Transfer <strong>{formatPHP(booking.depositAmount)}</strong> (50% downpayment)
-            to {RESORT.name}, then upload your payment screenshot below.
+            Complete your La Juana reservation by transferring{" "}
+            <strong>{formatPHP(booking.depositAmount)}</strong> via bank transfer, then
+            upload your payment screenshot below.
           </p>
           {booking.partnerDisplayName && (
             <span className="mt-4 inline-block rounded-full border border-line bg-brand-yellow-soft px-3 py-1 text-xs font-medium text-muted">
@@ -85,9 +90,7 @@ export default async function BookingPayPage({ params }: PayPageProps) {
             <p className="mt-2 text-2xl font-bold text-brand-blue">
               {formatPHP(booking.depositAmount)}
             </p>
-            <p className="mt-1 text-muted">
-              50% downpayment · {formatPHP(booking.totalAmount)} total
-            </p>
+            <p className="mt-1 text-muted">50% downpayment · {formatPHP(booking.totalAmount)} total</p>
           </div>
         </div>
 

@@ -32,20 +32,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (
-      booking.paymentReference &&
-      booking.paymentProofUrl &&
-      booking.guestEmail.toLowerCase() !== parsed.data.guestEmail.toLowerCase()
-    ) {
-      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-    }
-
-    if (
       booking.guestEmail.toLowerCase() !== parsed.data.guestEmail.toLowerCase()
     ) {
       return NextResponse.json({ error: "Email does not match this booking" }, { status: 403 });
     }
 
-    if (booking.paymentReference && booking.paymentProofUrl) {
+    if (booking.paymentProofUrl) {
       return NextResponse.json(
         { error: "Payment already submitted for this booking" },
         { status: 409 },
@@ -55,7 +47,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const updated = await prisma.booking.update({
       where: { id: booking.id },
       data: {
-        paymentReference: parsed.data.paymentReference,
+        paymentReference: parsed.data.paymentReference ?? null,
         paymentProofUrl: parsed.data.paymentProofUrl,
       },
       include: { roomType: true },

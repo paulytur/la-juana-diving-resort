@@ -11,6 +11,7 @@ import {
 } from "@/components/form-fields";
 import { FormSection } from "@/components/form-section";
 import type { RoomType } from "@/generated/prisma/client";
+import { PaymentReceiptUpload } from "@/components/payment-receipt-upload";
 import { cn } from "@/lib/cn";
 import { DEPOSIT_RATE, FEES } from "@/lib/constants";
 import { getRoomImage } from "@/lib/images";
@@ -90,11 +91,7 @@ export function BookingForm({
     dayTourGuests: 0,
   });
 
-  const [paymentReference, setPaymentReference] = useState("");
   const [paymentProofUrl, setPaymentProofUrl] = useState("");
-  const [uploadingProof, setUploadingProof] = useState(false);
-  const [proofError, setProofError] = useState<string | null>(null);
-  const proofInputRef = useRef<HTMLInputElement>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -183,37 +180,13 @@ export function BookingForm({
     };
   })();
 
-  async function handleProofUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploadingProof(true);
-    setProofError(null);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch("/api/upload/payment-proof", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Upload failed");
-      setPaymentProofUrl(data.imageUrl);
-    } catch (error) {
-      setProofError(error instanceof Error ? error.message : "Upload failed");
-    } finally {
-      setUploadingProof(false);
-      if (proofInputRef.current) proofInputRef.current.value = "";
-    }
-  }
-
   const contactComplete =
     contact.guestName.trim().length >= 2 &&
     /\S+@\S+\.\S+/.test(contact.guestEmail) &&
     contact.guestPhone.trim().length >= 7;
 
   async function handleSubmit() {
-    if (!selectedRoom || !paymentReference.trim() || !paymentProofUrl) return;
+    if (!selectedRoom || !paymentProofUrl) return;
 
     setSubmitting(true);
     setSubmitError(null);
@@ -227,7 +200,6 @@ export function BookingForm({
           checkOut,
           guests,
           ...contact,
-          paymentReference: paymentReference.trim(),
           paymentProofUrl,
           ...(partnerSource ? { partnerSource } : {}),
         }),
@@ -600,62 +572,11 @@ export function BookingForm({
                   </div>
                 </div>
 
-                <TextField
-                  label="Payment reference number"
-                  name="paymentReference"
-                  required
-                  placeholder="e.g. GCash ref 1234567890"
-                  value={paymentReference}
-                  onChange={(event) => setPaymentReference(event.target.value)}
+                <PaymentReceiptUpload
+                  value={paymentProofUrl}
+                  onChange={setPaymentProofUrl}
+                  disabled={submitting}
                 />
-
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-brand-blue">
-                    Upload payment receipt
-                  </p>
-                  <div className="flex flex-wrap items-start gap-4">
-                    <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-xl border border-line bg-brand-yellow-soft">
-                      {paymentProofUrl ? (
-                        <Image
-                          src={paymentProofUrl}
-                          alt="Payment receipt"
-                          fill
-                          className="object-cover"
-                          sizes="128px"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center px-2 text-center text-xs text-muted">
-                          No receipt yet
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        disabled={uploadingProof}
-                        onClick={() => proofInputRef.current?.click()}
-                        className="btn-secondary px-4 py-2 text-sm"
-                      >
-                        {uploadingProof ? "Uploading..." : "Upload screenshot"}
-                      </button>
-                      <input
-                        ref={proofInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        className="hidden"
-                        onChange={handleProofUpload}
-                      />
-                      <p className="input-hint max-w-xs">
-                        JPG, PNG, or WebP up to 5 MB.
-                      </p>
-                    </div>
-                  </div>
-                  {proofError && (
-                    <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                      {proofError}
-                    </p>
-                  )}
-                </div>
 
                 {submitError && (
                   <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -673,11 +594,7 @@ export function BookingForm({
                   </button>
                   <button
                     type="button"
-                    disabled={
-                      submitting ||
-                      !paymentReference.trim() ||
-                      !paymentProofUrl
-                    }
+                    disabled={submitting || !paymentProofUrl}
                     onClick={handleSubmit}
                     className="btn-primary flex-1 py-3 text-base"
                   >

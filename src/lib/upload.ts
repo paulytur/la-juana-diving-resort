@@ -10,18 +10,42 @@ const ALLOWED_TYPES = new Map([
   ["image/jpeg", ".jpg"],
   ["image/png", ".png"],
   ["image/webp", ".webp"],
+  ["image/heic", ".heic"],
+  ["image/heif", ".heif"],
+]);
+
+const EXTENSION_TYPES = new Map([
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".png", "image/png"],
+  [".webp", "image/webp"],
+  [".heic", "image/heic"],
+  [".heif", "image/heif"],
 ]);
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
 export type UploadFolder = "rooms" | "facilities" | "payments" | "settings";
 
+function resolveImageType(file: File) {
+  if (file.type && ALLOWED_TYPES.has(file.type)) {
+    return file.type;
+  }
+
+  const extension = path.extname(file.name).toLowerCase();
+  return EXTENSION_TYPES.get(extension) ?? null;
+}
+
 function buildFilename(file: File, extension: string) {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extension}`;
 }
 
 async function saveUploadedImageLocal(file: File, folder: UploadFolder) {
-  const extension = ALLOWED_TYPES.get(file.type)!;
+  const contentType = resolveImageType(file);
+  if (!contentType) {
+    throw new Error("Only JPG, PNG, WebP, and HEIC images are allowed.");
+  }
+  const extension = ALLOWED_TYPES.get(contentType)!;
   const filename = buildFilename(file, extension);
   const uploadDir = path.join(process.cwd(), "public", "images", folder);
   await mkdir(uploadDir, { recursive: true });
@@ -33,7 +57,11 @@ async function saveUploadedImageLocal(file: File, folder: UploadFolder) {
 }
 
 async function saveUploadedImageSupabase(file: File, folder: UploadFolder) {
-  const extension = ALLOWED_TYPES.get(file.type)!;
+  const contentType = resolveImageType(file);
+  if (!contentType) {
+    throw new Error("Only JPG, PNG, WebP, and HEIC images are allowed.");
+  }
+  const extension = ALLOWED_TYPES.get(contentType)!;
   const filename = buildFilename(file, extension);
   const storagePath = `${folder}/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -42,7 +70,7 @@ async function saveUploadedImageSupabase(file: File, folder: UploadFolder) {
   const { error } = await supabase.storage
     .from("uploads")
     .upload(storagePath, buffer, {
-      contentType: file.type,
+      contentType,
       upsert: false,
     });
 
@@ -54,8 +82,9 @@ async function saveUploadedImageSupabase(file: File, folder: UploadFolder) {
 }
 
 export async function saveUploadedImage(file: File, folder: UploadFolder) {
-  if (!ALLOWED_TYPES.has(file.type)) {
-    throw new Error("Only JPG, PNG, and WebP images are allowed.");
+  const contentType = resolveImageType(file);
+  if (!contentType) {
+    throw new Error("Only JPG, PNG, WebP, and HEIC images are allowed.");
   }
 
   if (file.size > MAX_BYTES) {

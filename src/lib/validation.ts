@@ -11,7 +11,7 @@ export const bookingSchema = z.object({
   specialRequests: z.string().max(500).optional(),
   pets: z.coerce.number().int().min(0).max(5).default(0),
   dayTourGuests: z.coerce.number().int().min(0).max(20).default(0),
-  paymentReference: z.string().min(2).max(100),
+  paymentReference: z.string().min(2).max(100).optional(),
   paymentProofUrl: z.string().min(1).max(500),
   partnerSource: z.string().max(80).optional(),
 });
@@ -76,9 +76,9 @@ export const partnerBookingSchema = z
     checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     guests: z.coerce.number().int().min(1).max(20),
-    guestName: z.string().min(2).max(100),
-    guestEmail: z.string().email(),
-    guestPhone: z.string().min(7).max(30),
+    guestName: z.string().min(2).max(100).optional(),
+    guestEmail: z.string().email().optional(),
+    guestPhone: z.string().min(7).max(30).optional(),
     specialRequests: z.string().max(500).optional(),
     pets: z.coerce.number().int().min(0).max(5).default(0),
     dayTourGuests: z.coerce.number().int().min(0).max(20).default(0),
@@ -87,12 +87,20 @@ export const partnerBookingSchema = z
   })
   .refine((data) => data.roomTypeId || data.roomSlug, {
     message: "roomTypeId or roomSlug is required",
-  });
+  })
+  .refine(
+    (data) => {
+      const paying = Boolean(data.paymentProofUrl);
+      if (!paying) return true;
+      return Boolean(data.guestName && data.guestEmail && data.guestPhone);
+    },
+    { message: "guestName, guestEmail, and guestPhone are required with payment" },
+  );
 
 export const bookingPaymentSchema = z.object({
   guestEmail: z.string().email(),
-  paymentReference: z.string().min(2).max(100),
   paymentProofUrl: z.string().min(1).max(500),
+  paymentReference: z.string().min(2).max(100).optional(),
 });
 
 export const partnerCreateSchema = z.object({

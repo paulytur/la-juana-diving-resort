@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAvailableRooms } from "@/lib/availability";
 import {
-  buildPartnerBookingUrl,
+  buildPartnerCheckoutUrl,
   getPartnerFromRequest,
   partnerCorsHeaders,
   partnerUnauthorizedMessage,
@@ -76,8 +76,16 @@ export async function GET(request: Request) {
       imageUrl: room.imageUrl,
       availableUnits,
       subtotal,
+      totalAmount: subtotal,
       deposit: calculateDeposit(subtotal),
-      bookUrl: buildPartnerBookingUrl({
+      checkoutUrl: buildPartnerCheckoutUrl({
+        partner,
+        checkIn,
+        checkOut,
+        guests,
+        room: room.slug,
+      }),
+      bookUrl: buildPartnerCheckoutUrl({
         partner,
         checkIn,
         checkOut,
@@ -90,18 +98,17 @@ export async function GET(request: Request) {
   return corsJson(request, {
     nights,
     partner: partner ?? null,
-    bookUrl: buildPartnerBookingUrl({
+    checkoutUrl: buildPartnerCheckoutUrl({
       partner,
       checkIn,
       checkOut,
       guests,
     }),
-    embedUrl: buildPartnerBookingUrl({
+    bookUrl: buildPartnerCheckoutUrl({
       partner,
       checkIn,
       checkOut,
       guests,
-      embed: true,
     }),
     rooms,
   });

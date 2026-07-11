@@ -41,13 +41,23 @@ export type PartnerBookingParams = {
   checkOut?: string;
   guests?: number;
   room?: string;
-  embed?: boolean;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
 };
 
-export function buildPartnerBookingUrl(params: PartnerBookingParams = {}) {
-  const base = params.embed
-    ? `${getSiteUrl()}/embed/book`
-    : `${getSiteUrl()}/book`;
+/** Partner slug allowed to use iframe embed (Immerseafy admin only). */
+export function getPartnerEmbedSlug() {
+  return (process.env.PARTNER_EMBED_SLUG ?? "immerseafy").trim().toLowerCase();
+}
+
+export function canPartnerUseEmbed(partnerSlug: string | null | undefined) {
+  if (!partnerSlug) return false;
+  return partnerSlug.trim().toLowerCase() === getPartnerEmbedSlug();
+}
+
+export function buildPartnerCheckoutUrl(params: PartnerBookingParams = {}) {
+  const base = `${getSiteUrl()}/book/checkout`;
   const search = new URLSearchParams();
 
   if (params.partner) search.set("partner", params.partner);
@@ -55,9 +65,28 @@ export function buildPartnerBookingUrl(params: PartnerBookingParams = {}) {
   if (params.checkOut) search.set("checkOut", params.checkOut);
   if (params.guests) search.set("guests", String(params.guests));
   if (params.room) search.set("room", params.room);
+  if (params.guestName) search.set("guestName", params.guestName);
+  if (params.guestEmail) search.set("guestEmail", params.guestEmail);
+  if (params.guestPhone) search.set("guestPhone", params.guestPhone);
 
   const query = search.toString();
   return query ? `${base}?${query}` : base;
+}
+
+export function buildPartnerPaymentUrl(
+  reference: string,
+  embed = false,
+  partnerSlug?: string | null,
+) {
+  if (embed && canPartnerUseEmbed(partnerSlug)) {
+    return `${getSiteUrl()}/embed/partner/pay/${reference}`;
+  }
+  return `${getSiteUrl()}/partner/pay/${reference}`;
+}
+
+/** @deprecated Use buildPartnerCheckoutUrl — partners go straight to payment. */
+export function buildPartnerBookingUrl(params: PartnerBookingParams = {}) {
+  return buildPartnerCheckoutUrl(params);
 }
 
 export function parsePartnerSource(value: string | null | undefined) {

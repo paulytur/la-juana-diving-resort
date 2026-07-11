@@ -2,81 +2,82 @@
 
 Let other websites send guests to book at La Juana. Three options:
 
-## 1. Booking link (simplest)
+## 1. Payment link (simplest)
 
-Send visitors to your booking page with optional pre-filled dates:
+Send visitors **directly to the payment page** with QR code and 50% downpayment. Include the room slug and dates:
 
 ```
-https://la-juana-resort.vercel.app/book?partner=PARTNER_ID&checkIn=2026-08-01&checkOut=2026-08-03&guests=4
+https://la-juana-resort.vercel.app/book/checkout?partner=PARTNER_ID&room=hiraya&checkIn=2026-08-01&checkOut=2026-08-03&guests=4
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| `partner` | Your partner ID (letters, numbers, `-`, `_`, `.`) — tracked on the booking |
-| `checkIn` | `YYYY-MM-DD` |
-| `checkOut` | `YYYY-MM-DD` |
-| `guests` | Number of guests |
-| `room` | Room slug, e.g. `hiraya`, `mix-dormitory` |
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `partner` | No | Partner ID for tracking |
+| `room` | Yes | Room slug, e.g. `hiraya`, `mix-dormitory` |
+| `checkIn` | Yes | `YYYY-MM-DD` |
+| `checkOut` | Yes | `YYYY-MM-DD` |
+| `guests` | Yes | Number of guests |
+| `guestName` | No | Pre-fill guest name |
+| `guestEmail` | No | Pre-fill guest email |
+| `guestPhone` | No | Pre-fill guest phone |
+
+The guest sees the La Juana room, pays **50% of the total stay** via QR, uploads their receipt, and the booking is confirmed. No separate booking request step.
 
 **Example — dive shop website:**
 
 ```html
 <a
-  href="https://la-juana-resort.vercel.app/book?partner=mabini-dive-shop&guests=4"
+  href="https://la-juana-resort.vercel.app/book/checkout?partner=mabini-dive-shop&room=hiraya&checkIn=2026-08-01&checkOut=2026-08-03&guests=4"
   target="_blank"
   rel="noopener"
 >
-  Book accommodation at La Juana
+  Pay downpayment at La Juana
 </a>
 ```
 
+For the full 3-step booking wizard (dates → room → payment), use `/book` instead of `/book/checkout`.
+
 ---
 
-## 2. Embed widget (iframe on their site)
+## 2. Pay button (opens La Juana in a new tab)
 
-Add this where the booking form should appear:
+Partners do **not** embed an iframe on their site. Guests are sent to La Juana to pay.
+
+Add a button that opens the checkout page in a new tab:
 
 ```html
 <script
   src="https://la-juana-resort.vercel.app/embed.js"
   data-partner="mabini-dive-shop"
+  data-room="hiraya"
   data-check-in="2026-08-01"
   data-check-out="2026-08-03"
   data-guests="4"
-  data-height="760"
+  data-label="Pay at La Juana Resort"
 ></script>
 ```
 
-### Button mode (opens booking in a new tab)
+Or link directly:
 
 ```html
-<script
-  src="https://la-juana-resort.vercel.app/embed.js"
-  data-mode="button"
-  data-partner="mabini-dive-shop"
-  data-label="Book La Juana Resort"
-></script>
+<a
+  href="https://la-juana-resort.vercel.app/partner/pay/LJ-20260801-ABC12"
+  target="_blank"
+  rel="noopener"
+>
+  Complete payment at La Juana
+</a>
 ```
 
-### Script attributes
+### Immerseafy admin only — iframe payment
 
-| Attribute | Default | Description |
-|-----------|---------|-------------|
-| `data-base` | Production URL | Your La Juana site URL |
-| `data-partner` | — | Partner ID for tracking |
-| `data-mode` | `embed` | `embed` (iframe) or `button` |
-| `data-height` | `760` | iframe height in pixels |
-| `data-check-in` | — | Pre-fill check-in date |
-| `data-check-out` | — | Pre-fill check-out date |
-| `data-guests` | — | Pre-fill guest count |
-| `data-room` | — | Pre-select room slug |
-| `data-label` | `Book with La Juana` | Button text (button mode) |
-
-Direct embed URL (without script):
+Only the **Immerseafy** partner (`PARTNER_EMBED_SLUG`) may embed the payment form in an iframe for internal admin use:
 
 ```
-https://la-juana-resort.vercel.app/embed/book?partner=PARTNER_ID
+https://la-juana-resort.vercel.app/embed/partner/pay/LJ-20260801-ABC12
 ```
+
+The partner API returns `urls.embedPayment` only for Immerseafy bookings. All other partners must redirect guests to `paymentUrl` (full page on La Juana).
 
 ---
 
@@ -101,21 +102,24 @@ The partner is identified by their key — no `partner` query parameter needed. 
 {
   "nights": 2,
   "partner": "mabini-dive-shop",
-  "bookUrl": "https://la-juana-resort.vercel.app/book?...",
-  "embedUrl": "https://la-juana-resort.vercel.app/embed/book?...",
+  "checkoutUrl": "https://la-juana-resort.vercel.app/book/checkout?...",
+  "bookUrl": "https://la-juana-resort.vercel.app/book/checkout?...",
   "rooms": [
     {
       "slug": "hiraya",
       "name": "Hiraya",
       "subtotal": 12000,
+      "totalAmount": 12000,
       "deposit": 6000,
-      "bookUrl": "https://la-juana-resort.vercel.app/book?...&room=hiraya"
+      "checkoutUrl": "https://la-juana-resort.vercel.app/book/checkout?...&room=hiraya"
     }
   ]
 }
 ```
 
-### Create a booking
+Each room's `deposit` is **50% of the La Juana room total** for those dates.
+
+### Create booking → redirect guest to pay on La Juana
 
 ```
 POST /api/partner/bookings
@@ -123,11 +127,13 @@ x-api-key: lj_live_...
 Content-Type: application/json
 ```
 
+Your site collects the guest and room details. La Juana creates the booking and returns a **payment URL**. Redirect the guest there to scan the QR and upload their receipt — payment always happens on La Juana.
+
 **Request body:**
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `roomSlug` or `roomTypeId` | Yes (one of) | Room to book |
+| `roomSlug` or `roomTypeId` | Yes (one of) | La Juana room to book |
 | `checkIn` | Yes | `YYYY-MM-DD` |
 | `checkOut` | Yes | `YYYY-MM-DD` |
 | `guests` | Yes | 1–20 |
@@ -137,12 +143,8 @@ Content-Type: application/json
 | `specialRequests` | No | Free text |
 | `pets` | No | Default `0` |
 | `dayTourGuests` | No | Default `0` |
-| `paymentReference` | No | GCash/bank ref (with `paymentProofUrl`) |
-| `paymentProofUrl` | No | Receipt image URL from upload |
 
-If payment fields are omitted, the response includes `urls.payment` — send the guest there to pay the 50% deposit via QR.
-
-**Example:**
+**Example — partner site redirects after booking:**
 
 ```javascript
 const response = await fetch(
@@ -164,13 +166,58 @@ const response = await fetch(
     }),
   },
 );
-const booking = await response.json();
-// booking.reference — booking ID
-// booking.urls.payment — send guest here if payment not included
-// booking.urls.confirmation — after payment is submitted
+const data = await response.json();
+// Redirect guest to La Juana partner payment page (bank transfer + receipt upload)
+window.location.href = data.paymentUrl;
 ```
 
 **Response (201):**
+
+```json
+{
+  "reference": "LJ-20260801-ABC12",
+  "paymentUrl": "https://la-juana-resort.vercel.app/partner/pay/LJ-20260801-ABC12",
+  "redirectUrl": "https://la-juana-resort.vercel.app/partner/pay/LJ-20260801-ABC12",
+  "pricing": {
+    "totalAmount": 12000,
+    "depositAmount": 6000
+  },
+  "message": "Booking created. Redirect the guest to paymentUrl to upload their bank transfer receipt on La Juana."
+}
+```
+
+For Immerseafy admin iframe only, use `urls.embedPayment` (`/embed/partner/pay/{reference}`). Other partners redirect guests to `paymentUrl`.
+
+### Partner payment page
+
+After redirect, the guest sees a dedicated page at `/partner/pay/{reference}`:
+
+1. **Bank transfer details** — account name, account number, exact amount (50% downpayment)
+2. **Optional QR** — for InstaPay / e-wallet if configured in admin
+3. **Upload receipt** — guest enters transfer reference and uploads screenshot from their bank app
+
+Direct link (after booking is created):
+
+```
+https://la-juana-resort.vercel.app/partner/pay/LJ-20260801-ABC12
+```
+
+### Checkout link (guest details not collected yet)
+
+If your site has not collected guest contact info, omit `guestName` / `guestEmail` / `guestPhone`. The API returns a `checkoutUrl` where the guest enters details and pays on La Juana.
+
+**Response (200):**
+
+```json
+{
+  "checkoutUrl": "https://la-juana-resort.vercel.app/book/checkout?partner=mabini-dive-shop&room=hiraya&checkIn=2026-08-01&checkOut=2026-08-03&guests=4",
+  "message": "Guest contact is required to create a booking..."
+}
+```
+
+### Confirm a booking with payment (server-side)
+
+If your server already has the guest's payment proof, include `paymentReference`, `paymentProofUrl`, and guest contact fields to create the booking immediately.
 
 ```json
 {
@@ -192,7 +239,7 @@ const booking = await response.json();
   },
   "payment": { "completed": false },
   "urls": {
-    "payment": "https://la-juana-resort.vercel.app/book/pay/LJ-20260801-ABC12",
+    "payment": "https://la-juana-resort.vercel.app/partner/pay/LJ-20260801-ABC12",
     "confirmation": "https://la-juana-resort.vercel.app/book/confirmation/LJ-20260801-ABC12",
     "invoice": null
   }
@@ -245,7 +292,7 @@ Create and manage partners in **Admin → Partners**:
 
 ## Tracking
 
-Bookings include `partnerSource` when the guest arrives via a partner link or embed. Only slugs of **registered, active partners** are stored — unknown partner IDs are ignored. View partner names in **Admin → Bookings**.
+Bookings include `partnerSource` when the guest arrives via a partner link. Only slugs of **registered, active partners** are stored — unknown partner IDs are ignored. View partner names in **Admin → Bookings**.
 
 ---
 
@@ -263,10 +310,10 @@ PARTNER_ALLOWED_ORIGINS="*"
 
 ## Booking flow for partners
 
-1. Guest finds La Juana on a partner site
-2. They open the booking link, embed, or room link from the API
-3. They complete the same 3-step flow (dates → room → 50% QR payment)
-4. Booking is tagged with the partner ID
-5. La Juana admin confirms and generates the invoice
+1. Guest books on the partner site (room, dates, contact)
+2. Partner calls `POST /api/partner/bookings` with guest details
+3. Partner **redirects the guest to `paymentUrl`** (`/partner/pay/{reference}`)
+4. Guest **bank-transfers** the 50% downpayment, then **uploads transfer receipt** on La Juana
+5. Booking is tagged with the partner ID — admin confirms and sends invoice
 
 Payment and confirmation stay on La Juana — partners do not handle money or admin access.

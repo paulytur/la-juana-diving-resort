@@ -3,6 +3,7 @@ import { BookingError, createBooking } from "@/lib/create-booking";
 import { prisma } from "@/lib/db";
 import { formatPartnerBooking } from "@/lib/partner-booking";
 import {
+  buildPartnerCheckoutUrl,
   getPartnerFromRequest,
   partnerCorsHeaders,
   partnerUnauthorizedMessage,
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
 
     const data = parsed.data;
     let roomTypeId = data.roomTypeId;
+    let roomSlug = data.roomSlug;
 
     if (!roomTypeId && data.roomSlug) {
       const room = await prisma.roomType.findUnique({
@@ -51,6 +53,59 @@ export async function POST(request: Request) {
         return corsJson(request, { error: "Room not found" }, 404);
       }
       roomTypeId = room.id;
+      roomSlug = room.slug;
+    } else if (roomTypeId && !roomSlug) {
+      const room = await prisma.roomType.findUnique({
+        where: { id: roomTypeId, isActive: true },
+      });
+      if (!room) {
+        return corsJson(request, { error: "Room not found" }, 404);
+      }
+      roomSlug = room.slug;
+    }
+
+    const hasPayment = Boolean(data.paymentProofUrl);
+    const hasGuest = Boolean(data.guestName && data.guestEmail && data.guestPhone);
+
+    if (!hasPayment) {
+      if (hasGuest) {
+        const booking = await createBooking({
+          roomTypeId: roomTypeId!,
+          checkIn: data.checkIn,
+          checkOut: data.checkOut,
+          guests: data.guests,
+          guestName: data.guestName!,
+          guestEmail: data.guestEmail!,
+          guestPhone: data.guestPhone!,
+          specialRequests: data.specialRequests,
+          pets: data.pets,
+          dayTourGuests: data.dayTourGuests,
+          partnerSource: partnerAccount.slug,
+        });
+
+        const formatted = formatPartnerBooking(booking);
+        return corsJson(
+          request,
+          {
+            ...formatted,
+            message:
+              "Booking created. Redirect the guest to paymentUrl to scan the QR and upload their receipt on La Juana.",
+          },
+          201,
+        );
+      }
+
+      return corsJson(request, {
+        checkoutUrl: buildPartnerCheckoutUrl({
+          partner: partnerAccount.slug,
+          checkIn: data.checkIn,
+          checkOut: data.checkOut,
+          guests: data.guests,
+          room: roomSlug,
+        }),
+        message:
+          "Guest contact is required to create a booking. Either include guestName, guestEmail, and guestPhone, or send the guest to checkoutUrl to enter details and pay on La Juana.",
+      });
     }
 
     const booking = await createBooking({
@@ -58,9 +113,9 @@ export async function POST(request: Request) {
       checkIn: data.checkIn,
       checkOut: data.checkOut,
       guests: data.guests,
-      guestName: data.guestName,
-      guestEmail: data.guestEmail,
-      guestPhone: data.guestPhone,
+      guestName: data.guestName!,
+      guestEmail: data.guestEmail!,
+      guestPhone: data.guestPhone!,
       specialRequests: data.specialRequests,
       pets: data.pets,
       dayTourGuests: data.dayTourGuests,
