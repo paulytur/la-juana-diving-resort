@@ -59,7 +59,7 @@ export default async function PartnerCheckoutPage({ searchParams }: CheckoutPage
     return (
       <PageShell>
         <SiteHeader />
-        <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-14">
+        <main className="mobile-page mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-14">
           <div className="mb-8 max-w-2xl">
             <p className="section-eyebrow">Secure your stay</p>
             <h1 className="section-title mt-2">Pay your downpayment</h1>

@@ -102,9 +102,9 @@ export function PartnerCheckoutForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={embedMode ? "space-y-6" : "space-y-8"}>
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
-        <div className="space-y-6">
+    <form onSubmit={handleSubmit} className={embedMode ? "mobile-page space-y-6" : "mobile-page space-y-8"}>
+      <div className="checkout-layout">
+        <div className="checkout-layout__main space-y-6">
           <section className="surface-card rounded-2xl p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
               La Juana room
@@ -281,13 +281,13 @@ export function PartnerCheckoutForm({
           <button
             type="submit"
             disabled={submitting || !contactComplete || !paymentProofUrl}
-            className="btn-primary w-full py-3.5 text-base disabled:opacity-60"
+            className="btn-primary touch-target w-full py-3.5 text-base disabled:opacity-60"
           >
             {submitting ? "Submitting..." : "Submit payment & confirm booking"}
           </button>
         </div>
 
-        <aside className="sticky-summary">
+        <aside className="checkout-layout__aside sticky-summary">
           <div className="surface-card rounded-2xl border-brand-yellow bg-brand-yellow-soft p-5">
             <h3 className="text-lg font-bold text-brand-blue">Price summary</h3>
             <dl className="mt-4 space-y-2 text-sm">

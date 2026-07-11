@@ -526,8 +526,8 @@ export function BookingForm({
       )}
 
       {step === 3 && selectedRoom && totals && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
-          <div className="space-y-6">
+        <div className="checkout-layout">
+          <div className="checkout-layout__main space-y-6">
             <FormSection
               title="Pay your downpayment"
               description="Scan the QR code to pay the 50% downpayment, then upload your receipt below."
@@ -596,7 +596,7 @@ export function BookingForm({
                     type="button"
                     disabled={submitting || !paymentProofUrl}
                     onClick={handleSubmit}
-                    className="btn-primary flex-1 py-3 text-base"
+                    className="btn-primary touch-target min-w-0 flex-1 py-3 text-base"
                   >
                     {submitting ? "Submitting..." : "Submit booking"}
                   </button>
@@ -605,7 +605,7 @@ export function BookingForm({
             </FormSection>
           </div>
 
-          <aside className="sticky-summary">
+          <aside className="checkout-layout__aside sticky-summary">
             <div className="surface-card rounded-2xl border-brand-yellow bg-brand-yellow-soft p-5">
               <h3 className="text-lg font-bold text-brand-blue">
                 Booking summary

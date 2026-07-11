@@ -51,7 +51,7 @@ export default async function BookingPayPage({ params }: PayPageProps) {
   return (
     <PageShell>
       <SiteHeader />
-      <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-14">
+      <main className="mobile-page mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-14">
         <div className="mb-8 max-w-2xl">
           <p className="section-eyebrow">Complete payment</p>
           <h1 className="section-title mt-2">Upload your bank transfer receipt</h1>
@@ -73,7 +73,7 @@ export default async function BookingPayPage({ params }: PayPageProps) {
             </p>
             <p className="mt-2 font-bold text-brand-blue">{paymentBooking.roomName}</p>
             <p className="mt-1 text-muted">{paymentBooking.stayDates}</p>
-            <p className="mt-1 text-muted">
+            <p className="mt-1 break-all text-muted">
               {paymentBooking.guests} guest{paymentBooking.guests === 1 ? "" : "s"} · Ref{" "}
               {reference}
             </p>

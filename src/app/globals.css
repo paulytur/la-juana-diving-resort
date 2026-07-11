@@ -140,7 +140,7 @@ body {
   background: #ffffff;
   padding: 0.75rem 1rem;
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: var(--ink);
   outline: none;
   transition:
@@ -184,7 +184,7 @@ body {
   background-color: #ffffff;
   padding: 0.75rem 2.75rem 0.75rem 1rem;
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 1rem;
   text-align: left;
   color: var(--ink);
   cursor: pointer;
@@ -493,7 +493,13 @@ input[type="number"].input-field::-webkit-inner-spin-button {
   border: 1px solid var(--border);
   border-radius: 1.25rem;
   background: #ffffff;
-  padding: 1.5rem;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .form-section {
+    padding: 1.5rem;
+  }
 }
 
 .form-section-title {
@@ -541,8 +547,49 @@ input[type="number"].input-field::-webkit-inner-spin-button {
 }
 
 .sticky-summary {
-  position: sticky;
-  top: 6rem;
+  position: static;
+}
+
+.checkout-layout {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.checkout-layout__main {
+  order: 2;
+}
+
+.checkout-layout__aside {
+  order: 1;
+}
+
+.mobile-page {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+.touch-target {
+  min-height: 2.75rem;
+  touch-action: manipulation;
+}
+
+@media (min-width: 1024px) {
+  .sticky-summary {
+    position: sticky;
+    top: 6rem;
+  }
+
+  .checkout-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+  }
+
+  .checkout-layout__main {
+    order: 1;
+  }
+
+  .checkout-layout__aside {
+    order: 2;
+  }
 }
 
 .floating-cta {

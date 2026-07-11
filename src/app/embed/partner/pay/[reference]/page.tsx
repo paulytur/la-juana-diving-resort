@@ -42,7 +42,7 @@ export default async function EmbedPartnerPayPage({ params }: EmbedPartnerPayPag
   const paymentBooking = toPartnerPaymentBooking(booking);
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+    <main className="mobile-page mx-auto max-w-4xl px-4 py-6 sm:px-6">
       <div className="mb-6 border-b border-line pb-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-brand-blue">
           {RESORT.name} · Partner payment

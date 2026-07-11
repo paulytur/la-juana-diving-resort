@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { RESORT } from "@/lib/constants";
@@ -14,6 +14,12 @@ export const metadata: Metadata = {
     template: `%s | ${RESORT.name}`,
   },
   description: RESORT.description,
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

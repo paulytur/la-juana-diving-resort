@@ -24,8 +24,8 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
   return (
     <PageShell>
       <SiteHeader />
-      <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-        <div className="surface-card rounded-[2rem] border-brand-yellow bg-brand-yellow-soft p-8 text-center">
+      <main className="mobile-page mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+        <div className="surface-card rounded-[1.5rem] border-brand-yellow bg-brand-yellow-soft p-5 text-center sm:rounded-[2rem] sm:p-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-blue text-2xl font-bold text-white">
             ✓
           </div>
@@ -36,7 +36,7 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
           <p className="section-lead mt-4">
             Your booking request was received. Keep this reference handy:
           </p>
-          <p className="mt-3 inline-block rounded-xl bg-white px-5 py-2 font-mono text-lg font-bold text-brand-blue">
+          <p className="mt-3 inline-block max-w-full break-all rounded-xl bg-white px-4 py-2 font-mono text-base font-bold text-brand-blue sm:px-5 sm:text-lg">
             {booking.reference}
           </p>
         </div>
@@ -119,7 +119,7 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
               href={`/api/bookings/${booking.reference}/invoice`}
               target="_blank"
               rel="noreferrer"
-              className="btn-primary mt-6 inline-flex px-5 py-2.5 text-sm"
+              className="btn-primary touch-target mt-6 inline-flex w-full justify-center px-5 py-3 text-sm sm:w-auto sm:py-2.5"
             >
               Download invoice (PDF)
             </a>
