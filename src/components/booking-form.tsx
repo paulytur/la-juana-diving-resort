@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { format, parseISO } from "date-fns";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -10,11 +11,18 @@ import {
   TextField,
 } from "@/components/form-fields";
 import { FormSection } from "@/components/form-section";
+import { FormField } from "@/components/form-field";
 import type { RoomType } from "@/generated/prisma/client";
 import { PaymentReceiptUpload } from "@/components/payment-receipt-upload";
+import { CapacityProgress, QuantityStepper } from "@/components/quantity-stepper";
 import { cn } from "@/lib/cn";
 import { DEPOSIT_RATE, FEES } from "@/lib/constants";
 import { getRoomImage } from "@/lib/images";
+import {
+  calculateSelectionTotals,
+  getMaxBookableGuests,
+  selectionCapacity,
+} from "@/lib/multi-room";
 import { formatPHP } from "@/lib/pricing";
 import type { PaymentSettings } from "@/lib/settings";
 
@@ -47,12 +55,20 @@ type BookingFormProps = {
 };
 
 function guestRange(rooms: RoomType[]) {
-  const min = Math.min(...rooms.map((room) => room.capacityMin), 1);
-  const max = Math.max(...rooms.map((room) => room.capacityMax), 1);
-  return Array.from({ length: max - min + 1 }, (_, index) => min + index);
+  const max = Math.min(20, getMaxBookableGuests(rooms));
+  return Array.from({ length: Math.max(max, 1) }, (_, index) => index + 1);
 }
 
-const STEPS = ["Dates & guests", "Choose a room", "Pay & confirm"] as const;
+const STEPS = [
+  { short: "Dates", full: "Dates & guests" },
+  { short: "Rooms", full: "Choose a room" },
+  { short: "Pay", full: "Pay & confirm" },
+] as const;
+
+function formatStayPreview(checkIn: string, checkOut: string) {
+  if (!checkIn || !checkOut || checkOut <= checkIn) return null;
+  return `${format(parseISO(checkIn), "MMM d")} – ${format(parseISO(checkOut), "MMM d, yyyy")}`;
+}
 
 export function BookingForm({
   rooms,
@@ -76,8 +92,15 @@ export function BookingForm({
     initialGuests ?? initialRoom?.capacityMin ?? 1,
   );
 
+  const maxGuests = useMemo(() => {
+    const range = guestRange(rooms);
+    return range[range.length - 1] ?? 1;
+  }, [rooms]);
+
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
   const [nights, setNights] = useState(0);
+  const [multiRoom, setMultiRoom] = useState(false);
+  const [roomQuantities, setRoomQuantities] = useState<Record<string, number>>({});
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -103,6 +126,43 @@ export function BookingForm({
 
   const selectedRoom = availableRooms.find((room) => room.id === selectedRoomId);
 
+  const roomById = useMemo(
+    () =>
+      new Map(
+        availableRooms.map((room) => [
+          room.id,
+          {
+            id: room.id,
+            slug: room.slug,
+            name: room.name,
+            capacityMin: room.capacityMin,
+            capacityMax: room.capacityMax,
+            pricePerNight: room.pricePerNight,
+            pricePerPerson: room.pricePerPerson,
+            availableUnits: room.availableUnits,
+          },
+        ]),
+      ),
+    [availableRooms],
+  );
+
+  const roomSelections = useMemo(
+    () =>
+      Object.entries(roomQuantities)
+        .filter(([, quantity]) => quantity > 0)
+        .map(([roomTypeId, quantity]) => ({ roomTypeId, quantity })),
+    [roomQuantities],
+  );
+
+  const selectedCapacity = useMemo(
+    () => selectionCapacity(roomSelections, roomById),
+    [roomSelections, roomById],
+  );
+
+  const roomSelectionComplete = multiRoom
+    ? roomSelections.length > 0 && selectedCapacity >= guests
+    : Boolean(selectedRoom);
+
   const searchAvailability = useCallback(async () => {
     setSearching(true);
     setSearchError(null);
@@ -119,6 +179,8 @@ export function BookingForm({
       }
       setAvailableRooms(data.rooms as AvailableRoom[]);
       setNights(data.nights as number);
+      setMultiRoom(Boolean(data.multiRoom));
+      setRoomQuantities({});
       return data.rooms as AvailableRoom[];
     } catch (error) {
       setSearchError(
@@ -166,6 +228,30 @@ export function BookingForm({
   }, [autoSearch, checkIn, checkOut, initialRoomSlug, searchAvailability]);
 
   const totals = (() => {
+    if (multiRoom) {
+      if (roomSelections.length === 0) return null;
+      try {
+        const groupTotals = calculateSelectionTotals({
+          selections: roomSelections,
+          roomById,
+          totalGuests: guests,
+          nights,
+          pets: contact.pets,
+          dayTourGuests: contact.dayTourGuests,
+        });
+        return {
+          subtotal: groupTotals.subtotal,
+          petFee: groupTotals.petFee,
+          dayTourFee: groupTotals.dayTourFee,
+          total: groupTotals.totalAmount,
+          deposit: groupTotals.depositAmount,
+          balance: groupTotals.balanceDue,
+        };
+      } catch {
+        return null;
+      }
+    }
+
     if (!selectedRoom) return null;
     const petFee = contact.pets * FEES.pet;
     const dayTourFee = contact.dayTourGuests * FEES.dayTour;
@@ -186,23 +272,27 @@ export function BookingForm({
     contact.guestPhone.trim().length >= 7;
 
   async function handleSubmit() {
-    if (!selectedRoom || !paymentProofUrl) return;
+    if (!roomSelectionComplete || !paymentProofUrl || !totals) return;
 
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const payload = {
+        checkIn,
+        checkOut,
+        guests,
+        ...contact,
+        paymentProofUrl,
+        ...(partnerSource ? { partnerSource } : {}),
+        ...(multiRoom
+          ? { rooms: roomSelections }
+          : { roomTypeId: selectedRoom!.id }),
+      };
+
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roomTypeId: selectedRoom.id,
-          checkIn,
-          checkOut,
-          guests,
-          ...contact,
-          paymentProofUrl,
-          ...(partnerSource ? { partnerSource } : {}),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -217,18 +307,31 @@ export function BookingForm({
     }
   }
 
+  function updateRoomQuantity(roomId: string, nextQuantity: number, maxUnits: number) {
+    const quantity = Math.max(0, Math.min(nextQuantity, maxUnits));
+    setRoomQuantities((current) => {
+      const updated = { ...current };
+      if (quantity === 0) {
+        delete updated[roomId];
+      } else {
+        updated[roomId] = quantity;
+      }
+      return updated;
+    });
+  }
+
   return (
     <div className={embedMode ? "space-y-6" : "space-y-8"}>
       <ol className="flex flex-wrap gap-3">
-        {STEPS.map((label, index) => {
+        {STEPS.map((stepItem, index) => {
           const stepNumber = index + 1;
           const active = stepNumber === step;
           const done = stepNumber < step;
           return (
             <li
-              key={label}
+              key={stepItem.full}
               className={cn(
-                "flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition",
+                "flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition sm:px-4",
                 active
                   ? "border-brand-blue bg-brand-blue text-white"
                   : done
@@ -238,7 +341,7 @@ export function BookingForm({
             >
               <span
                 className={cn(
-                  "flex h-5 w-5 items-center justify-center rounded-full text-xs",
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs",
                   active
                     ? "bg-white text-brand-blue"
                     : done
@@ -248,7 +351,8 @@ export function BookingForm({
               >
                 {done ? "✓" : stepNumber}
               </span>
-              {label}
+              <span className="sm:hidden">{stepItem.short}</span>
+              <span className="hidden sm:inline">{stepItem.full}</span>
             </li>
           );
         })}
@@ -286,20 +390,38 @@ export function BookingForm({
               />
             </div>
 
-            <SelectField
-              label="Number of guests"
-              hint="We'll show rooms that fit your group size."
-              name="guests"
-              required
-              value={guests}
-              onChange={(event) => setGuests(Number(event.target.value))}
+            <FormField
+              label="How many guests?"
+              hint={
+                guests > 6
+                  ? "Large group — you'll pick multiple rooms on the next step."
+                  : "Include everyone staying overnight."
+              }
             >
-              {guestRange(rooms).map((count) => (
-                <option key={count} value={count}>
-                  {count} {count === 1 ? "guest" : "guests"}
-                </option>
-              ))}
-            </SelectField>
+              <QuantityStepper
+                value={guests}
+                min={1}
+                max={maxGuests}
+                onChange={setGuests}
+                unitLabel="guest"
+                compact
+              />
+            </FormField>
+
+            {hasDates && (
+              <div className="rounded-2xl border border-brand-blue/20 bg-brand-blue-light/40 px-4 py-3 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Your trip
+                </p>
+                <p className="mt-1 font-semibold text-brand-blue">
+                  {formatStayPreview(checkIn, checkOut)}
+                </p>
+                <p className="mt-0.5 text-muted">
+                  {guests} guest{guests === 1 ? "" : "s"}
+                  {guests > 6 ? " · multiple rooms needed" : ""}
+                </p>
+              </div>
+            )}
 
             {searchError && (
               <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -326,35 +448,48 @@ export function BookingForm({
 
       {step === 2 && (
         <div className="space-y-6">
+          {multiRoom && availableRooms.length > 0 && (
+            <CapacityProgress selected={selectedCapacity} required={guests} />
+          )}
+
           <FormSection
-            title="Available rooms"
-            description={`${availableRooms.length} room${availableRooms.length === 1 ? "" : "s"} available for ${guests} guest${guests === 1 ? "" : "s"} · ${nights} night${nights === 1 ? "" : "s"}.`}
+            title={multiRoom ? "Pick your rooms" : "Pick a room"}
+            description={
+              multiRoom
+                ? `Choose enough rooms for your group of ${guests}. Tap + to add rooms.`
+                : `${availableRooms.length} option${availableRooms.length === 1 ? "" : "s"} for ${guests} guest${guests === 1 ? "" : "s"} · ${nights} night${nights === 1 ? "" : "s"}.`
+            }
           >
             {availableRooms.length === 0 ? (
-              <div className="rounded-xl border border-line bg-brand-yellow-soft px-4 py-6 text-center text-sm text-muted">
-                <p>No rooms available for these dates and guest count.</p>
+              <div className="rounded-xl border border-line bg-brand-yellow-soft px-4 py-8 text-center">
+                <p className="font-semibold text-brand-blue">Nothing available for these dates</p>
+                <p className="mt-2 text-sm text-muted">
+                  Try different dates or fewer guests.
+                </p>
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="btn-secondary mt-4 px-5 py-2.5 text-sm"
+                  className="btn-secondary mt-5 px-5 py-2.5 text-sm"
                 >
-                  Change dates or guests
+                  ← Change dates or guests
                 </button>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {availableRooms.map((room) => {
-                  const selected = room.id === selectedRoomId;
+                  const selected = multiRoom
+                    ? (roomQuantities[room.id] ?? 0) > 0
+                    : room.id === selectedRoomId;
+                  const quantity = roomQuantities[room.id] ?? 0;
+
                   return (
-                    <button
+                    <div
                       key={room.id}
-                      type="button"
-                      onClick={() => setSelectedRoomId(room.id)}
                       className={cn(
                         "group flex flex-col overflow-hidden rounded-2xl border-[1.5px] bg-white text-left transition",
                         selected
                           ? "border-brand-blue ring-4 ring-brand-blue/10"
-                          : "border-line hover:border-brand-blue/40",
+                          : "border-line",
                       )}
                     >
                       <div className="relative aspect-[4/3] w-full overflow-hidden bg-brand-yellow-soft">
@@ -373,9 +508,7 @@ export function BookingForm({
                       </div>
                       <div className="flex flex-1 flex-col gap-2 p-4">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-bold text-brand-blue">
-                            {room.name}
-                          </h3>
+                          <h3 className="font-bold text-brand-blue">{room.name}</h3>
                           <span className="shrink-0 text-sm font-semibold text-brand-blue">
                             {room.pricePerPerson
                               ? `${formatPHP(room.pricePerNight)}/pax`
@@ -385,31 +518,67 @@ export function BookingForm({
                         <p className="text-xs text-muted">
                           Fits {room.capacityMin}–{room.capacityMax} · {room.beds}
                         </p>
-                        {room.pricePerPerson && (
-                          <p className="text-xs text-muted">
-                            {room.availableUnits} bed
-                            {room.availableUnits === 1 ? "" : "s"} left
-                          </p>
+                        <p className="text-xs text-muted">
+                          {room.availableUnits} unit{room.availableUnits === 1 ? "" : "s"}{" "}
+                          available
+                        </p>
+                        {multiRoom ? (
+                          <div className="mt-auto space-y-2 rounded-xl bg-brand-yellow-soft p-3">
+                            <p className="text-xs font-semibold text-brand-blue">
+                              {room.pricePerPerson
+                                ? "Beds needed"
+                                : `Up to ${room.capacityMax} guests per room`}
+                            </p>
+                            <QuantityStepper
+                              value={quantity}
+                              min={0}
+                              max={room.availableUnits}
+                              onChange={(next) =>
+                                updateRoomQuantity(room.id, next, room.availableUnits)
+                              }
+                              unitLabel={room.pricePerPerson ? "bed" : "room"}
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRoomId(room.id)}
+                            className={cn(
+                              "mt-auto w-full rounded-xl px-3 py-3 text-left text-xs transition",
+                              selected
+                                ? "bg-brand-blue text-white"
+                                : "bg-brand-yellow-soft hover:bg-brand-yellow",
+                            )}
+                          >
+                            <div className="flex justify-between font-semibold">
+                              <span>{nights} night{nights === 1 ? "" : "s"} total</span>
+                              <span>{formatPHP(room.subtotal)}</span>
+                            </div>
+                            <div
+                              className={cn(
+                                "mt-0.5 flex justify-between",
+                                selected ? "text-white/80" : "text-muted",
+                              )}
+                            >
+                              <span>50% downpayment</span>
+                              <span>{formatPHP(room.deposit)}</span>
+                            </div>
+                            {!selected && (
+                              <span className="mt-2 block text-center text-[0.7rem] font-bold uppercase tracking-wide text-brand-blue">
+                                Tap to select
+                              </span>
+                            )}
+                          </button>
                         )}
-                        <div className="mt-auto rounded-lg bg-brand-yellow-soft px-3 py-2 text-xs">
-                          <div className="flex justify-between font-semibold text-brand-blue">
-                            <span>{nights} night total</span>
-                            <span>{formatPHP(room.subtotal)}</span>
-                          </div>
-                          <div className="mt-0.5 flex justify-between text-muted">
-                            <span>50% downpayment</span>
-                            <span>{formatPHP(room.deposit)}</span>
-                          </div>
-                        </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
             )}
           </FormSection>
 
-          {selectedRoom && (
+          {roomSelectionComplete && (
             <FormSection
               title="Your contact details"
               description="We'll use this to confirm your reservation."
@@ -510,14 +679,19 @@ export function BookingForm({
             </button>
             <button
               type="button"
-              disabled={!selectedRoom || !contactComplete}
+              disabled={!roomSelectionComplete || !contactComplete}
               onClick={() => setStep(3)}
               className="btn-primary flex-1 py-3 text-base"
             >
               Continue to payment
             </button>
           </div>
-          {selectedRoom && !contactComplete && (
+          {!roomSelectionComplete && multiRoom && (
+            <p className="rounded-xl border border-brand-yellow bg-brand-yellow-soft px-4 py-3 text-center text-sm text-muted">
+              Keep adding rooms until all <strong>{guests} guests</strong> are covered.
+            </p>
+          )}
+          {roomSelectionComplete && !contactComplete && (
             <p className="input-hint text-center">
               Fill in your name, email, and phone to continue.
             </p>
@@ -525,7 +699,7 @@ export function BookingForm({
         </div>
       )}
 
-      {step === 3 && selectedRoom && totals && (
+      {step === 3 && roomSelectionComplete && totals && (
         <div className="checkout-layout">
           <div className="checkout-layout__main space-y-6">
             <FormSection
@@ -610,30 +784,50 @@ export function BookingForm({
               <h3 className="text-lg font-bold text-brand-blue">
                 Booking summary
               </h3>
-              <div className="mt-3 overflow-hidden rounded-xl bg-white/70">
-                <div className="relative h-28 w-full">
-                  <Image
-                    src={getRoomImage(selectedRoom.slug, selectedRoom.imageUrl)}
-                    alt={selectedRoom.name}
-                    fill
-                    className="object-cover"
-                    sizes="320px"
-                  />
-                </div>
-                <div className="px-4 py-3 text-sm">
-                  <p className="font-semibold text-brand-blue">
-                    {selectedRoom.name}
-                  </p>
-                  <p className="mt-1 text-muted">
-                    {guests} guest{guests === 1 ? "" : "s"} · {nights} night
-                    {nights === 1 ? "" : "s"}
-                  </p>
-                </div>
+              <div className="mt-3 space-y-3 rounded-xl bg-white/70 p-4 text-sm">
+                {multiRoom ? (
+                  <>
+                    <p className="font-semibold text-brand-blue">
+                      {roomSelections.length} room
+                      {roomSelections.length === 1 ? "" : "s"} · {guests} guests
+                    </p>
+                    <ul className="space-y-2 text-muted">
+                      {roomSelections.map(({ roomTypeId, quantity }) => {
+                        const room = availableRooms.find((item) => item.id === roomTypeId);
+                        if (!room) return null;
+                        return (
+                          <li key={roomTypeId}>
+                            {quantity}× {room.name} (fits up to {room.capacityMax})
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                ) : selectedRoom ? (
+                  <>
+                    <div className="relative h-28 w-full overflow-hidden rounded-xl">
+                      <Image
+                        src={getRoomImage(selectedRoom.slug, selectedRoom.imageUrl)}
+                        alt={selectedRoom.name}
+                        fill
+                        className="object-cover"
+                        sizes="320px"
+                      />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-brand-blue">{selectedRoom.name}</p>
+                      <p className="mt-1 text-muted">
+                        {guests} guest{guests === 1 ? "" : "s"} · {nights} night
+                        {nights === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  </>
+                ) : null}
               </div>
 
               <dl className="mt-4 space-y-2 text-sm text-foreground">
                 <div className="flex justify-between">
-                  <dt className="text-muted">Room</dt>
+                  <dt className="text-muted">{multiRoom ? "Rooms" : "Room"}</dt>
                   <dd>{formatPHP(totals.subtotal)}</dd>
                 </div>
                 {totals.petFee > 0 && (

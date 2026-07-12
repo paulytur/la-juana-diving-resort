@@ -1,11 +1,13 @@
 import type { Booking, RoomType } from "@/generated/prisma/client";
 import { buildPartnerCheckoutUrl, buildPartnerPaymentUrl, canPartnerUseEmbed } from "@/lib/partner";
+import { getPartnerActions, getPartnerSyncStatus } from "@/lib/partner-sync";
 import { getSiteUrl } from "@/lib/partner-client";
 import { formatDateRange } from "@/lib/pricing";
 
 export type BookingWithRoom = Booking & { roomType: RoomType };
 
 export function formatPartnerBooking(booking: BookingWithRoom) {
+  const syncStatus = getPartnerSyncStatus(booking);
   const paymentComplete = Boolean(booking.paymentProofUrl);
 
   const paymentUrl = paymentComplete
@@ -17,9 +19,11 @@ export function formatPartnerBooking(booking: BookingWithRoom) {
       ? null
       : buildPartnerPaymentUrl(booking.reference, true, booking.partnerSource);
 
-  return {
+  const formatted = {
     reference: booking.reference,
+    partnerBookingReference: booking.partnerBookingReference,
     status: booking.status,
+    syncStatus,
     partner: booking.partnerSource,
     paymentUrl,
     redirectUrl: paymentUrl,
@@ -77,5 +81,11 @@ export function formatPartnerBooking(booking: BookingWithRoom) {
           : null,
     },
     createdAt: booking.createdAt.toISOString(),
+    updatedAt: booking.updatedAt.toISOString(),
+  };
+
+  return {
+    ...formatted,
+    actions: getPartnerActions(booking),
   };
 }

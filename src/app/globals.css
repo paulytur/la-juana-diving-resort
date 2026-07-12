@@ -370,7 +370,7 @@ body {
   color: var(--muted);
 }
 
-.date-picker__day {
+.date-picker__day-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -382,39 +382,41 @@ body {
   font-weight: 500;
   color: var(--ink);
   transition:
-    background 0.15s ease,
+    background-color 0.15s ease,
     color 0.15s ease,
     border-color 0.15s ease;
 }
 
-.date-picker__day:hover:not(:disabled) {
-  background: var(--brand-yellow-soft);
-  border-color: var(--brand-yellow);
-}
-
-.date-picker__day--outside {
+.date-picker__day-btn[data-outside="true"] {
   color: #b8c2d9;
 }
 
-.date-picker__day--today {
+.date-picker__day-btn[data-today="true"] {
   border-color: rgba(26, 66, 196, 0.25);
   color: var(--brand-blue);
   font-weight: 700;
 }
 
-.date-picker__day--selected {
-  background: var(--brand-blue);
-  border-color: var(--brand-blue);
-  color: #ffffff;
+.date-picker__day-btn:not([data-selected="true"]):hover:not(:disabled) {
+  background-color: var(--brand-yellow-soft);
+  border-color: var(--brand-yellow);
+  color: var(--ink);
+}
+
+.date-picker__day-btn[data-selected="true"] {
+  background-color: var(--brand-blue) !important;
+  border-color: var(--brand-blue) !important;
+  color: #ffffff !important;
   font-weight: 700;
 }
 
-.date-picker__day--selected:hover:not(:disabled) {
-  background: var(--brand-blue-dark);
-  border-color: var(--brand-blue-dark);
+.date-picker__day-btn[data-selected="true"]:hover:not(:disabled) {
+  background-color: var(--brand-blue-dark) !important;
+  border-color: var(--brand-blue-dark) !important;
+  color: #ffffff !important;
 }
 
-.date-picker__day--disabled {
+.date-picker__day-btn:disabled {
   cursor: not-allowed;
   opacity: 0.35;
 }
@@ -454,10 +456,6 @@ input[type="number"].input-field::-webkit-inner-spin-button {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--brand-blue);
-}
-
-.date-range-group button[type="button"] {
-  background-color: #ffffff;
 }
 
 .date-range-group > div > label > span:first-child {

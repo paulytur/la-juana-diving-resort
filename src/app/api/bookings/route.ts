@@ -16,8 +16,9 @@ export async function POST(request: Request) {
     }
 
     const data = parsed.data;
-    const booking = await createBooking({
+    const result = await createBooking({
       roomTypeId: data.roomTypeId,
+      rooms: data.rooms,
       checkIn: data.checkIn,
       checkOut: data.checkOut,
       guests: data.guests,
@@ -32,7 +33,17 @@ export async function POST(request: Request) {
       partnerSource: await resolvePartnerSlug(data.partnerSource),
     });
 
-    return NextResponse.json(booking, { status: 201 });
+    return NextResponse.json(
+      {
+        ...result.bookings[0],
+        reference: result.reference,
+        groupReference: result.groupReference,
+        groupTotalAmount: result.totalAmount,
+        groupDepositAmount: result.depositAmount,
+        groupBookings: result.bookings,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof BookingError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

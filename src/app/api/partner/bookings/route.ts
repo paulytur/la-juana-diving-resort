@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
     if (!hasPayment) {
       if (hasGuest) {
-        const booking = await createBooking({
+        const result = await createBooking({
           roomTypeId: roomTypeId!,
           checkIn: data.checkIn,
           checkOut: data.checkOut,
@@ -83,11 +83,12 @@ export async function POST(request: Request) {
           partnerSource: partnerAccount.slug,
         });
 
-        const formatted = formatPartnerBooking(booking);
+        const formatted = formatPartnerBooking(result.bookings[0]);
         return corsJson(
           request,
           {
             ...formatted,
+            groupReference: result.groupReference,
             message:
               "Booking created. Redirect the guest to paymentUrl to scan the QR and upload their receipt on La Juana.",
           },
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const booking = await createBooking({
+    const result = await createBooking({
       roomTypeId: roomTypeId!,
       checkIn: data.checkIn,
       checkOut: data.checkOut,
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
       partnerSource: partnerAccount.slug,
     });
 
-    return corsJson(request, formatPartnerBooking(booking), 201);
+    return corsJson(request, formatPartnerBooking(result.bookings[0]), 201);
   } catch (error) {
     if (error instanceof BookingError) {
       return corsJson(request, { error: error.message }, error.status);

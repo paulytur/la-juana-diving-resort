@@ -97,6 +97,25 @@ export async function getAvailableRooms(
   return results;
 }
 
+/** All active rooms with remaining inventory for the dates (multi-room booking). */
+export async function getRoomsWithAvailability(checkIn: Date, checkOut: Date) {
+  const rooms = await prisma.roomType.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  const results = [];
+
+  for (const room of rooms) {
+    const { available } = await getBookedCountForRoom(room.id, checkIn, checkOut);
+    if (available > 0) {
+      results.push({ room, availableUnits: available });
+    }
+  }
+
+  return results;
+}
+
 export async function getAvailabilityByDate(
   roomTypeId: string,
   checkIn: Date,

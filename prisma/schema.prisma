@@ -58,6 +58,8 @@ model Booking {
   paymentProofUrl  String?
   invoiceUrl       String?
   partnerSource    String?
+  partnerBookingReference String?
+  groupReference   String?
   adminNotes      String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

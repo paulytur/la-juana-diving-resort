@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { getAvailableRooms } from "@/lib/availability";
+import { getAvailableRooms, getRoomsWithAvailability } from "@/lib/availability";
+import { prisma } from "@/lib/db";
+import {
+  getMaxBookableGuests,
+  getMaxSingleRoomCapacity,
+  needsMultipleRooms,
+  unitSubtotal,
+} from "@/lib/multi-room";
 import { calculateDeposit, parseDateInput } from "@/lib/pricing";
 
 export async function GET(request: Request) {
@@ -23,16 +30,45 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
   }
 
-  const available = await getAvailableRooms(checkInDate, checkOutDate, guests);
+  const allRooms = await prisma.roomType.findMany({
+    where: { isActive: true },
+    select: { capacityMax: true, inventory: true, pricePerPerson: true },
+  });
+
+  const maxSingleRoomCapacity = getMaxSingleRoomCapacity(allRooms);
+  const maxBookableGuests = getMaxBookableGuests(allRooms);
+  const multiRoom = needsMultipleRooms(guests, allRooms);
+
+  if (guests > maxBookableGuests) {
+    return NextResponse.json(
+      {
+        error: `We can accommodate up to ${maxBookableGuests} guests across available rooms. Please contact us for larger groups.`,
+      },
+      { status: 400 },
+    );
+  }
 
   const nights = Math.round(
     (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24),
   );
 
-  const rooms = available.map(({ room, available: availableUnits }) => {
-    const subtotal = room.pricePerPerson
-      ? room.pricePerNight * guests * nights
-      : room.pricePerNight * nights;
+  const available = multiRoom
+    ? await getRoomsWithAvailability(checkInDate, checkOutDate)
+    : await getAvailableRooms(checkInDate, checkOutDate, guests);
+
+  const rooms = available.map((entry) => {
+    const room = entry.room;
+    const units =
+      "availableUnits" in entry ? entry.availableUnits : entry.available;
+    const fitsSingleRoom =
+      !multiRoom &&
+      guests >= room.capacityMin &&
+      guests <= room.capacityMax &&
+      units >= 1;
+    const guestsForPreview = multiRoom
+      ? Math.min(room.capacityMax, guests)
+      : guests;
+    const subtotal = unitSubtotal(room, nights, guestsForPreview);
 
     return {
       id: room.id,
@@ -45,11 +81,20 @@ export async function GET(request: Request) {
       pricePerNight: room.pricePerNight,
       pricePerPerson: room.pricePerPerson,
       imageUrl: room.imageUrl,
-      availableUnits,
+      availableUnits: units,
+      fitsSingleRoom,
       subtotal,
       deposit: calculateDeposit(subtotal),
+      unitSubtotal: unitSubtotal(room, nights, room.pricePerPerson ? 1 : 1),
     };
   });
 
-  return NextResponse.json({ nights, rooms });
+  return NextResponse.json({
+    nights,
+    guests,
+    multiRoom,
+    maxSingleRoomCapacity,
+    maxBookableGuests,
+    rooms,
+  });
 }

@@ -92,7 +92,7 @@ function DatePickerCalendar({
     : placeholder;
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div ref={rootRef} className={cn("relative", open && "z-50", className)}>
       <button
         id={id}
         type="button"
@@ -130,7 +130,7 @@ function DatePickerCalendar({
 
       {open && !disabled && (
         <div
-          className="date-picker__popover absolute left-0 top-[calc(100%+0.5rem)] z-[100] rounded-2xl border-[1.5px] border-line bg-white shadow-[0_16px_40px_rgba(26,66,196,0.14)]"
+          className="date-picker__popover absolute left-0 top-[calc(100%+0.5rem)] z-[110] rounded-2xl border-[1.5px] border-line bg-white shadow-[0_16px_40px_rgba(26,66,196,0.14)]"
           role="dialog"
           aria-label="Choose date"
         >
@@ -175,16 +175,11 @@ function DatePickerCalendar({
                   type="button"
                   disabled={dayDisabled}
                   aria-label={format(day, "MMMM d, yyyy")}
-                  aria-pressed={selected}
-                  className={[
-                    "date-picker__day",
-                    outsideMonth && "date-picker__day--outside",
-                    selected && "date-picker__day--selected",
-                    isToday && !selected && "date-picker__day--today",
-                    dayDisabled && "date-picker__day--disabled",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
+                  aria-selected={selected}
+                  data-selected={selected ? "true" : undefined}
+                  data-today={isToday && !selected ? "true" : undefined}
+                  data-outside={outsideMonth && !selected ? "true" : undefined}
+                  className="date-picker__day-btn"
                   onClick={() => handleSelect(day)}
                 >
                   {format(day, "d")}

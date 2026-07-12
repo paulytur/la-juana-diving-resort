@@ -21,6 +21,18 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
 
   if (!booking) notFound();
 
+  const groupBookings = booking.groupReference
+    ? await prisma.booking.findMany({
+        where: { groupReference: booking.groupReference },
+        include: { roomType: true },
+        orderBy: { createdAt: "asc" },
+      })
+    : [booking];
+
+  const totalAmount = groupBookings.reduce((sum, item) => sum + item.totalAmount, 0);
+  const depositAmount = groupBookings.reduce((sum, item) => sum + item.depositAmount, 0);
+  const totalGuests = groupBookings.reduce((sum, item) => sum + item.guests, 0);
+
   return (
     <PageShell>
       <SiteHeader />
@@ -37,8 +49,13 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
             Your booking request was received. Keep this reference handy:
           </p>
           <p className="mt-3 inline-block max-w-full break-all rounded-xl bg-white px-4 py-2 font-mono text-base font-bold text-brand-blue sm:px-5 sm:text-lg">
-            {booking.reference}
+            {booking.groupReference ?? booking.reference}
           </p>
+          {booking.groupReference && (
+            <p className="mt-2 text-xs text-muted">
+              Primary room reference: {booking.reference}
+            </p>
+          )}
         </div>
 
         <div className="surface-card mt-8 rounded-2xl p-6 sm:p-8">
@@ -129,17 +146,27 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
         <div className="surface-card mt-6 rounded-2xl p-6 sm:p-8">
           <h2 className="text-xl font-bold text-brand-blue">Booking summary</h2>
           <dl className="mt-5 space-y-3 text-sm">
+            {groupBookings.length > 1 && (
+              <div className="rounded-xl border border-line bg-brand-yellow-soft px-4 py-3">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Rooms booked
+                </dt>
+                <dd className="mt-2 space-y-1 font-medium text-brand-blue">
+                  {groupBookings.map((item) => (
+                    <p key={item.id}>
+                      {item.roomType.name} · {item.guests} guest
+                      {item.guests === 1 ? "" : "s"}
+                    </p>
+                  ))}
+                </dd>
+              </div>
+            )}
             {[
-              ["Room", booking.roomType.name],
+              ...(groupBookings.length === 1
+                ? ([["Room", booking.roomType.name]] as const)
+                : []),
               ["Dates", formatDateRange(booking.checkIn, booking.checkOut)],
-              ["Guests", String(booking.guests)],
-              ["Room total", formatPHP(booking.subtotal)],
-              ...(booking.petFee > 0
-                ? [["Pet fee", formatPHP(booking.petFee)] as const]
-                : []),
-              ...(booking.dayTourFee > 0
-                ? [["Day tour", formatPHP(booking.dayTourFee)] as const]
-                : []),
+              ["Guests", String(totalGuests)],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -151,15 +178,15 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
             ))}
             <div className="flex justify-between gap-4 border-t border-line pt-4 text-base font-bold text-brand-blue">
               <dt>Total</dt>
-              <dd>{formatPHP(booking.totalAmount)}</dd>
+              <dd>{formatPHP(totalAmount)}</dd>
             </div>
             <div className="flex justify-between gap-4 text-sm font-semibold text-brand-blue">
               <dt>Downpayment paid (50%)</dt>
-              <dd>{formatPHP(booking.depositAmount)}</dd>
+              <dd>{formatPHP(depositAmount)}</dd>
             </div>
             <div className="flex justify-between gap-4 text-sm text-muted">
               <dt>Balance on arrival</dt>
-              <dd>{formatPHP(booking.totalAmount - booking.depositAmount)}</dd>
+              <dd>{formatPHP(totalAmount - depositAmount)}</dd>
             </div>
           </dl>
         </div>
